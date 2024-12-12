@@ -1,45 +1,49 @@
 require("dotenv").config();
 const discord = require("discord.js");
 const {
-  ticketChannelId,
-  adminChannelId,
-  ticketPrefix,
+  ticketChannelId, // ID do canal de tickets
+  adminChannelId, // ID do canal de alertas para administradores
+  ticketPrefix, // Prefixo utilizado para iniciar o comando de ticket
 } = require("./config.json");
 
+// Inicializa o cliente do Discord com os intents necessários
 const neder = new discord.Client({
   intents: [
-    discord.GatewayIntentBits.DirectMessages,
-    discord.GatewayIntentBits.Guilds,
-    discord.GatewayIntentBits.GuildBans,
-    discord.GatewayIntentBits.GuildMessages,
-    discord.GatewayIntentBits.MessageContent,
+    discord.GatewayIntentBits.DirectMessages, // Permite ler mensagens diretas
+    discord.GatewayIntentBits.Guilds, // Permite interagir com guilds
+    discord.GatewayIntentBits.GuildBans, // Permite ver e gerenciar banimentos
+    discord.GatewayIntentBits.GuildMessages, // Permite ler mensagens nos canais
+    discord.GatewayIntentBits.MessageContent, // Permite ler o conteúdo das mensagens
   ],
-  partials: [discord.Partials.Channel],
+  partials: [discord.Partials.Channel], // Permite lidar com canais parcialmente carregados
 });
 
 let usernameBot = "";
-const currentYear = new Date().getFullYear();
+const currentYear = new Date().getFullYear(); // Obtém o ano atual
 let footerText = `Bot © ${currentYear}`;
 
+// Quando o bot estiver pronto, define o status e o nome
 neder.on("ready", () => {
-  usernameBot = neder.user.username;
-  footerText = `${usernameBot} © ${currentYear}`;
-  neder.user.setStatus("online");
-  console.log("🟢 " + neder.user.username + " está online!");
+  usernameBot = neder.user.username; // Define o nome do bot
+  footerText = `${usernameBot} © ${currentYear}`; // Define o rodapé com o nome do bot
+  neder.user.setStatus("online"); // Define o status do bot como online
+  console.log("🟢 " + neder.user.username + " está online!"); // Log para saber que o bot está online
 });
 
+// Quando uma mensagem for criada, processa o comando de ticket
 neder.on("messageCreate", async (msg) => {
-  if (msg.author.bot) return;
-  if (!msg.member.permissions.has("Administrador")) return;
-  if (msg.channel.type === "dm") return;
+  if (msg.author.bot) return; // Ignora mensagens de outros bots
+  if (!msg.member.permissions.has("Administrador")) return; // Só permite admins
+  if (msg.channel.type === "dm") return; // Ignora mensagens em DM
 
   const prefix = ticketPrefix;
 
-  if (!msg.content.startsWith(prefix)) return;
+  if (!msg.content.startsWith(prefix)) return; // Verifica se a mensagem começa com o prefixo do ticket
   const ticketChannel = neder.channels.cache.find(
     (channel) => channel.id === ticketChannelId
   );
-  msg.delete();
+  msg.delete(); // Deleta a mensagem do comando
+
   const row = new discord.ActionRowBuilder().addComponents(
     new discord.ButtonBuilder()
       .setCustomId("ticket")
@@ -67,6 +71,7 @@ neder.on("messageCreate", async (msg) => {
   ticketChannel.send({ ephemeral: true, embeds: [embed], components: [row] });
 });
 
+// Processa as interações dos botões, como a criação e exclusão de tickets
 neder.on("interactionCreate", async (interaction) => {
   if (interaction.customId === "ticket") {
     if (!interaction.isButton()) return;
@@ -77,6 +82,8 @@ neder.on("interactionCreate", async (interaction) => {
     const adminAlertChannel = neder.channels.cache.find(
       (channel) => channel.id === adminChannelId
     );
+
+    // Verifica se o usuário já tem um ticket aberto
     const errorEmbed = new discord.EmbedBuilder()
       .setDescription(
         "❌ Você já possui um ticket aberto! Encerre o ticket atual para poder abrir um novo."
@@ -100,7 +107,7 @@ neder.on("interactionCreate", async (interaction) => {
       });
 
     const adminMessage = new discord.EmbedBuilder()
-      .setDescription(`☄️ Um ticket foi aberto! ${interaction.user.id}`)
+      .setDescription(`✅ Um ticket foi aberto! ${interaction.user.id}`)
       .addFields([
         {
           name: "😀 Usuário:",
@@ -115,6 +122,7 @@ neder.on("interactionCreate", async (interaction) => {
           "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
       });
 
+    // Verifica se já existe um canal de ticket aberto para o usuário
     for (const channel of guildChannels.values()) {
       if (channel.name.startsWith("ticket")) {
         if (channel.topic === interaction.user.id) {
@@ -125,6 +133,7 @@ neder.on("interactionCreate", async (interaction) => {
 
     adminAlertChannel.send({ ephemeral: true, embeds: [adminMessage] });
 
+    // Criação do canal de texto para o ticket
     guild.channels
       .create({
         name: interactionChannelName,
@@ -134,21 +143,30 @@ neder.on("interactionCreate", async (interaction) => {
             allow: [
               discord.PermissionFlagsBits.SendMessages,
               discord.PermissionFlagsBits.ViewChannel,
+              discord.PermissionFlagsBits.Connect,
             ],
           },
           {
             id: interaction.guild.roles.everyone,
-            deny: [discord.PermissionFlagsBits.ViewChannel],
+            deny: [
+              discord.PermissionFlagsBits.ViewChannel,
+              discord.PermissionFlagsBits.Connect,
+            ],
           },
         ],
         type: discord.ChannelType.GuildText,
-        //parent: 'xxx',
+        parent: "1316632228150902804", // ID da categoria de suporte
       })
       .then(async (channel) => {
         channel.setTopic(interaction.user.id);
+
+        // Envia uma mensagem ao usuário informando sobre o ticket
         const embed = new discord.EmbedBuilder()
           .setDescription(
-            "☄️ Você solicitou um ticket. Entraremos em contato o mais rápido possível, aguarde. Clique no botão vermelho para encerrar o ticket."
+            `✅ Você solicitou um ticket. Entraremos em contato o mais rápido possível, aguarde. Clique no botão vermelho para encerrar o ticket.
+            
+            🔊 **Canal de voz de suporte criado. Entre para atendimento**. ${interaction.user.username}!
+            `
           )
           .setColor("#2f3136")
           .setFooter({
@@ -164,20 +182,88 @@ neder.on("interactionCreate", async (interaction) => {
             .setStyle("Danger")
         );
 
-        await channel.send({
-          ephemeral: true,
-          embeds: [embed],
-          components: [deleteButton],
-          content: `||<@${interaction.user.id}>||`,
-        });
+        // Criação do canal de voz
+        guild.channels
+          .create({
+            name: `${interactionChannelName}`, // Nome do canal de voz
+            type: discord.ChannelType.GuildVoice, // Tipo de canal de voz
+            parent: "1316632228150902804", // Categoria de suporte (mesma do canal de texto)
+            permissionOverwrites: [
+              {
+                id: interaction.user.id,
+                allow: [
+                  discord.PermissionFlagsBits.Connect, // Permite que o usuário entre no canal
+                  discord.PermissionFlagsBits.Speak, // Permite que o usuário fale
+                ],
+              },
+              {
+                id: interaction.guild.roles.everyone,
+                deny: [
+                  discord.PermissionFlagsBits.Connect, // Impede que outros usuários entrem
+                ],
+              },
+            ],
+          })
+          .then((voiceChannel) => {
+            // Envia mensagem de confirmação para o usuário sobre o canal de voz
+            voiceChannel.send(
+              `🔊 **Canal de voz de suporte criado. Entre para atendimento**. ${interaction.user.username}!`
+            );
+
+            const buttonTest = new discord.ActionRowBuilder().addComponents(
+              new discord.ButtonBuilder()
+                .setLabel("Redirect Ticket")
+                .setURL(
+                  `https://discord.com/channels/${interaction.guild.id}/${voiceChannel.id}}`
+                )
+                .setStyle("Link")
+            );
+
+            channel.send({
+              ephemeral: true,
+              embeds: [embed],
+              components: [deleteButton, buttonTest],
+              content: `<@${interaction.user.id}>`,
+            });
+          });
+
         interaction.reply({ ephemeral: true, embeds: [sucessEmbed] });
       });
   }
+
+  // Lógica de cancelamento de ticket
   if (interaction.customId === "delete") {
-    interaction.channel.delete();
+    const textChannel = interaction.channel;
+    const voiceChannelName = `ticket-${textChannel.name.split("-")[1]}`;
+
+    // Debugando o nome do canal de voz
+    console.log(`Tentando excluir o canal de voz: ${voiceChannelName}`);
+
+    // Excluindo o canal de texto
+    textChannel.delete().catch(console.error);
+
+    // Procurando o canal de voz pelo nome gerado
+    const voiceChannel = interaction.guild.channels.cache.find(
+      (channel) =>
+        channel.name === voiceChannelName &&
+        channel.type === discord.ChannelType.GuildVoice
+    );
+
+    // Verificando se o canal de voz foi encontrado
+    if (voiceChannel) {
+      console.log(`Canal de voz encontrado: ${voiceChannel.name}`);
+      // Excluindo o canal de voz
+      voiceChannel.delete().catch(console.error);
+    } else {
+      console.log(
+        `Canal de voz não encontrado com o nome: ${voiceChannelName}`
+      );
+    }
+
     const adminAlertChannel = neder.channels.cache.find(
       (channel) => channel.id === adminChannelId
     );
+
     const deleteMessage = new discord.EmbedBuilder()
       .setDescription(`❌ Ticket encerrado! ${interaction.user.id}`)
       .addFields([
@@ -194,13 +280,9 @@ neder.on("interactionCreate", async (interaction) => {
           "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
       });
 
-    await interaction.user
-      .send({ ephemeral: true, embeds: [deleteMessage] })
-      .catch(() => {
-        adminAlertChannel.send({ ephemeral: true, embeds: [deleteMessage] });
-        return false;
-      });
     adminAlertChannel.send({ ephemeral: true, embeds: [deleteMessage] });
   }
 });
+
+// Loga o bot com o token
 neder.login(process.env.TOKEN);
