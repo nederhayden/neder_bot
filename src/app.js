@@ -1,18 +1,19 @@
 require("dotenv").config();
-const { discord } = require("./utils/imports");
 const { startBot } = require("./config/startBot");
-const { currentYear } = require("./utils/functions");
-
 const {
-  ticketPrefix, // Prefixo utilizado para iniciar o comando
-  adminChannelId, // ID do canal de alertas para administradores
-} = require("../config.json");
+  currentYear,
+  formattedDate,
+  formattedTime,
+} = require("./utils/functions");
+const { discord } = require("./utils/imports");
+
 const { client } = require("./client/client");
+const { adminChannelId, ticketPrefix } = require("./config/config.json");
 
 const { closeTicket, redirectChannel } = require("./commands/ticket/buttons");
 const { TicketManager } = require("./commands/ticket/TicketManager");
 
-let footerText = `Bot © ${currentYear}`;
+let footerText = `Neder Bot © ${currentYear}`;
 
 startBot();
 
@@ -25,7 +26,7 @@ client.on("messageCreate", async (msg) => {
   const prefix = ticketPrefix;
 
   if (!msg.content.startsWith(prefix)) return; // Verifica se a mensagem começa com o prefixo do ticket
-  TicketManager();
+  TicketManager(footerText);
 });
 
 // Processa as interações dos botões, como a criação e exclusão de tickets
@@ -47,9 +48,7 @@ client.on("interactionCreate", async (interaction) => {
       )
       .setColor("#2f3136")
       .setFooter({
-        text: "Neder_Bot © 2025",
-        iconURL:
-          "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
+        text: footerText,
       });
 
     const sucessEmbed = new discord.EmbedBuilder()
@@ -59,24 +58,30 @@ client.on("interactionCreate", async (interaction) => {
       .setColor("#2f3136")
       .setFooter({
         text: footerText,
-        iconURL:
-          "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
       });
 
     const adminMessage = new discord.EmbedBuilder()
-      .setDescription(`✅ Um ticket foi aberto! ${interaction.user.id}`)
+      .setDescription(`✅ Um ticket foi aberto! `)
       .addFields([
         {
-          name: "😀 Usuário:",
+          name: "Usuário:",
           value: `${interaction.user.username}`,
+          inline: true,
+        },
+        {
+          name: "ID:",
+          value: `${interaction.user.id}`,
+          inline: true,
+        },
+        {
+          name: "Data e Hora:",
+          value: `${formattedDate} - ${formattedTime}`,
           inline: true,
         },
       ])
       .setColor("#2f3136")
       .setFooter({
         text: footerText,
-        iconURL:
-          "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
       });
 
     // Verifica se já existe um canal de ticket aberto para o usuário
@@ -120,16 +125,18 @@ client.on("interactionCreate", async (interaction) => {
         // Envia uma mensagem ao usuário informando sobre o ticket
         const embed = new discord.EmbedBuilder()
           .setDescription(
-            `✅ Você solicitou um ticket. Entraremos em contato o mais rápido possível, aguarde. Clique no botão vermelho para encerrar o ticket.
+            `✅ Você abriu um ticket. 
+            Entraremos em contato o mais rápido possível, por favor aguarde. 
+            Clique no botão vermelho caso deseje fechar o ticket.
             
-            🔊 **Canal de voz de suporte criado. Entre para atendimento**. ${interaction.user.username}!
+            🔊 **Canal de voz de suporte criado. Entre para aguardar o atendimento**.
+
+            ${formattedDate} - ${formattedTime}
             `
           )
           .setColor("#2f3136")
           .setFooter({
             text: footerText,
-            iconURL:
-              "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
           });
 
         // Criação do canal de voz
@@ -209,19 +216,27 @@ client.on("interactionCreate", async (interaction) => {
     );
 
     const deleteMessage = new discord.EmbedBuilder()
-      .setDescription(`❌ Ticket encerrado! ${interaction.user.id}`)
+      .setDescription(`❌ Ticket encerrado!`)
       .addFields([
         {
-          name: "😀 Usuário:",
+          name: "Usuário:",
           value: `${interaction.user.username}`,
+          inline: true,
+        },
+        {
+          name: "ID:",
+          value: `${interaction.user.id}`,
+          inline: true,
+        },
+        {
+          name: "Data e Hora:",
+          value: `${formattedDate} - ${formattedTime}`,
           inline: true,
         },
       ])
       .setColor("#2f3136")
       .setFooter({
         text: footerText,
-        iconURL:
-          "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
       });
 
     adminAlertChannel.send({ ephemeral: true, embeds: [deleteMessage] });
@@ -229,4 +244,4 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 // Loga o bot com o token
-client.login(process.env.TOKEN);
+client.login(process.env.BOT_TOKEN);

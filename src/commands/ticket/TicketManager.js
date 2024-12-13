@@ -1,9 +1,7 @@
 const { openTicket } = require("./buttons");
 const { discord } = require("../../utils/imports");
 
-const TicketManager = () => {
-  let footerText = `Bot © ${currentYear}`;
-
+const TicketManager = (footerText) => {
   const ticketChannel = client.channels.cache.find(
     (channel) => channel.id === ticketChannelId
   );
@@ -15,7 +13,7 @@ const TicketManager = () => {
       "https://cdn.discordapp.com/attachments/999055075899088908/999559700163067985/Component_4.png"
     )
     .setAuthor({
-      name: "Criar ticket de atendimento",
+      name: "Abrir ticket de atendimento",
       iconURL:
         "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
       url: "",
@@ -32,5 +30,4 @@ const TicketManager = () => {
     components: [openTicket],
   });
 };
-
 module.exports = { TicketManager };
