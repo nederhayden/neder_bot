@@ -1,85 +1,42 @@
 require("dotenv").config();
-const discord = require("discord.js");
+const { discord } = require("./utils/imports");
+const { startBot } = require("./config/startBot");
+const { currentYear } = require("./utils/functions");
+
 const {
-  ticketChannelId, // ID do canal de tickets
+  ticketPrefix, // Prefixo utilizado para iniciar o comando
   adminChannelId, // ID do canal de alertas para administradores
-  ticketPrefix, // Prefixo utilizado para iniciar o comando de ticket
-} = require("./config.json");
+} = require("../config.json");
+const { client } = require("./client/client");
 
-// Inicializa o cliente do Discord com os intents necessários
-const neder = new discord.Client({
-  intents: [
-    discord.GatewayIntentBits.DirectMessages, // Permite ler mensagens diretas
-    discord.GatewayIntentBits.Guilds, // Permite interagir com guilds
-    discord.GatewayIntentBits.GuildBans, // Permite ver e gerenciar banimentos
-    discord.GatewayIntentBits.GuildMessages, // Permite ler mensagens nos canais
-    discord.GatewayIntentBits.MessageContent, // Permite ler o conteúdo das mensagens
-  ],
-  partials: [discord.Partials.Channel], // Permite lidar com canais parcialmente carregados
-});
+const { closeTicket, redirectChannel } = require("./commands/ticket/buttons");
+const { TicketManager } = require("./commands/ticket/TicketManager");
 
-let usernameBot = "";
-const currentYear = new Date().getFullYear(); // Obtém o ano atual
 let footerText = `Bot © ${currentYear}`;
 
-// Quando o bot estiver pronto, define o status e o nome
-neder.on("ready", () => {
-  usernameBot = neder.user.username; // Define o nome do bot
-  footerText = `${usernameBot} © ${currentYear}`; // Define o rodapé com o nome do bot
-  neder.user.setStatus("online"); // Define o status do bot como online
-  console.log("🟢 " + neder.user.username + " está online!"); // Log para saber que o bot está online
-});
+startBot();
 
 // Quando uma mensagem for criada, processa o comando de ticket
-neder.on("messageCreate", async (msg) => {
+client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return; // Ignora mensagens de outros bots
-  if (!msg.member.permissions.has("Administrador")) return; // Só permite admins
+  if (!msg.member.permissions.has(["CEO", "Administrador"])) return; // Só permite admins
   if (msg.channel.type === "dm") return; // Ignora mensagens em DM
 
   const prefix = ticketPrefix;
 
   if (!msg.content.startsWith(prefix)) return; // Verifica se a mensagem começa com o prefixo do ticket
-  const ticketChannel = neder.channels.cache.find(
-    (channel) => channel.id === ticketChannelId
-  );
-  msg.delete(); // Deleta a mensagem do comando
-
-  const row = new discord.ActionRowBuilder().addComponents(
-    new discord.ButtonBuilder()
-      .setCustomId("ticket")
-      .setLabel("Criar Ticket")
-      .setStyle("Secondary")
-  );
-
-  const embed = new discord.EmbedBuilder()
-    .setColor("#2f3136")
-    .setImage(
-      "https://cdn.discordapp.com/attachments/999055075899088908/999559700163067985/Component_4.png"
-    )
-    .setAuthor({
-      name: "Criar ticket de atendimento | Neder_Bot",
-      iconURL:
-        "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
-      url: "https://discord.com/invite/dX5RtYepjp",
-    })
-    .setFooter({
-      text: footerText,
-      iconURL:
-        "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
-    });
-
-  ticketChannel.send({ ephemeral: true, embeds: [embed], components: [row] });
+  TicketManager();
 });
 
 // Processa as interações dos botões, como a criação e exclusão de tickets
-neder.on("interactionCreate", async (interaction) => {
+client.on("interactionCreate", async (interaction) => {
   if (interaction.customId === "ticket") {
     if (!interaction.isButton()) return;
-    const guild = neder.guilds.cache.get(interaction.guild.id);
+    const guild = client.guilds.cache.get(interaction.guild.id);
     const guildChannels = guild.channels.cache;
     const userFirstName = interaction.user.username.split(" ")[0].toLowerCase();
     const interactionChannelName = `ticket-${userFirstName}`;
-    const adminAlertChannel = neder.channels.cache.find(
+    const adminAlertChannel = client.channels.cache.find(
       (channel) => channel.id === adminChannelId
     );
 
@@ -175,13 +132,6 @@ neder.on("interactionCreate", async (interaction) => {
               "https://cdn.discordapp.com/attachments/929573302098362399/999093804034445442/Logo_4.png",
           });
 
-        const deleteButton = new discord.ActionRowBuilder().addComponents(
-          new discord.ButtonBuilder()
-            .setCustomId("delete")
-            .setLabel("Cancelar Ticket")
-            .setStyle("Danger")
-        );
-
         // Criação do canal de voz
         guild.channels
           .create({
@@ -210,19 +160,13 @@ neder.on("interactionCreate", async (interaction) => {
               `🔊 **Canal de voz de suporte criado. Entre para atendimento**. ${interaction.user.username}!`
             );
 
-            const buttonTest = new discord.ActionRowBuilder().addComponents(
-              new discord.ButtonBuilder()
-                .setLabel("Redirect Ticket")
-                .setURL(
-                  `https://discord.com/channels/${interaction.guild.id}/${voiceChannel.id}}`
-                )
-                .setStyle("Link")
-            );
-
             channel.send({
               ephemeral: true,
               embeds: [embed],
-              components: [deleteButton, buttonTest],
+              components: [
+                closeTicket,
+                redirectChannel(interaction, voiceChannel),
+              ],
               content: `<@${interaction.user.id}>`,
             });
           });
@@ -260,7 +204,7 @@ neder.on("interactionCreate", async (interaction) => {
       );
     }
 
-    const adminAlertChannel = neder.channels.cache.find(
+    const adminAlertChannel = client.channels.cache.find(
       (channel) => channel.id === adminChannelId
     );
 
@@ -285,4 +229,4 @@ neder.on("interactionCreate", async (interaction) => {
 });
 
 // Loga o bot com o token
-neder.login(process.env.TOKEN);
+client.login(process.env.TOKEN);
